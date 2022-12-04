@@ -646,15 +646,18 @@ uint64_t find_bootargs_adr(uint64_t region, uint8_t* data, size_t size)
 
 uint64_t find_zero(uint64_t region, uint8_t* data, size_t size)
 {
-    unsigned char zeroBuf[0x288];
-    memset(&zeroBuf, '\0', 0x288);
-    uint32_t* zero = memmem(data, size, zeroBuf, 0x288);
+    unsigned char zeroBuf[0x150];
+    memset(&zeroBuf, '\0', 0x150);
+    uint32_t* zero = memmem(data, size, zeroBuf, 0x150);
     if(!zero)
         return 0;
     
     zero += 2;
     
-    return ((uintptr_t)zero - (uintptr_t)data);
+    uint64_t address = ((uintptr_t)zero - (uintptr_t)data);
+    address = address &~ 0x3;
+    
+    return address;
 }
 
 
@@ -714,6 +717,31 @@ uint64_t find_go_cmd_handler(uint64_t region, uint8_t* data, size_t size)
     
     return ((uintptr_t)ptr - (uintptr_t)data) + 8;
 }
+
+uint64_t find_panic(uint64_t region, uint8_t* data, size_t size)
+{
+    uint8_t* str = memmem(data, size, "unknown LPDDR4 density %d", sizeof("unknown LPDDR4 density %d"));
+    
+    if(!str)
+        str = memmem(data, size, "Failed to find adfe tunables info, bailing adfe_init()\n", sizeof("Failed to find adfe tunables info, bailing adfe_init()\n"));
+    
+    if(!str)
+        return 0;
+    
+    // Find a reference to the string.
+    uint32_t* ref = find_literal_ref_64(region, data, size, (uint32_t*)data, (uintptr_t)str - (uintptr_t)data);
+    if (!ref)
+        return 0;
+    
+    // find BL
+    uint32_t *bl_addr = find_next_insn_matching_64(region, data, size, ref, insn_is_bl_64);
+    if (!bl_addr)
+        return 0;
+    
+    
+    return ((uintptr_t)bl_addr - (uintptr_t)data) + insn_bl_imm32_64(bl_addr);
+}
+
 
 uint64_t find_kc(uint64_t region, uint8_t* data, size_t size)
 {

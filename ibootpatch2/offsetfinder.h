@@ -22,5 +22,5 @@ uint64_t find_bootx_cmd_handler(uint64_t region, uint8_t* data, size_t size);
 uint64_t find_go_cmd_handler(uint64_t region, uint8_t* data, size_t size);
 uint64_t find_kc(uint64_t region, uint8_t* data, size_t size);
 uint32_t make_branch(uint64_t w, uint64_t a);
-
+uint64_t find_panic(uint64_t region, uint8_t* data, size_t size);
 #endif

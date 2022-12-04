@@ -37,17 +37,38 @@ int open_file(char *file, size_t *sz, unsigned char **buf)
     return 0;
 }
 
+#define SUB (0x000100000)
+
 int main(int argc, char **argv)
 {
     
-    if(argc != 3){
-        printf("%s <in> <out>\n", argv[0]);
+    if(argc != 4){
+        printf("%s [--t8015/--t8010] <in> <out>\n", argv[0]);
         return 0;
     }
     
-    char *infile = argv[1];
-    char *outfile = argv[2];
+    char *chip = argv[1];
+    char *infile = argv[2];
+    char *outfile = argv[3];
+    uint16_t cpid;
+    uint64_t sdram_page1 = 0;
+    uint64_t load_address = 0;
+    if(!strcmp(chip, "--t8015")) {
+        cpid = 0x8015;
+        sdram_page1     = 0x180002000;
+        load_address    = 0x801000000;
+    }
     
+    if(!strcmp(chip, "--t8010")) {
+        cpid = 0x8010;
+        sdram_page1     = 0x180082000;
+        load_address    = 0x800800000;
+    }
+    
+    if(!cpid) {
+        printf("%s [--t8015/--t8010] <in> <out>\n", argv[0]);
+        return -1;
+    }
     
     unsigned char* idata;
     size_t isize;
@@ -62,6 +83,26 @@ int main(int argc, char **argv)
         if(!iboot_base)
             goto end;
         printf("%016llx[%016llx]: iboot_base\n", iboot_base, (uint64_t)0x300);
+        
+        if(0) {
+            /*---- test part ----*/
+            uint64_t test_printf = find_printf(iboot_base, idata, isize);
+            if(test_printf)
+                printf("%016llx[%016llx]: test_printf\n", test_printf + iboot_base, test_printf);
+            
+            uint64_t test_mount_and_boot_system = find_mount_and_boot_system(iboot_base, idata, isize);
+            if(test_mount_and_boot_system)
+                printf("%016llx[%016llx]: test_mount_and_boot_system\n", test_mount_and_boot_system + iboot_base, test_mount_and_boot_system);
+            
+            uint64_t test_jumpto_func = find_jumpto_func(iboot_base, idata, isize);
+            if(test_jumpto_func)
+                printf("%016llx[%016llx]: test_jumpto_func\n", test_jumpto_func + iboot_base, test_jumpto_func);
+            
+            uint64_t test_panic = find_panic(iboot_base, idata, isize);
+            if(test_panic)
+                printf("%016llx[%016llx]: test_panic\n", test_panic + iboot_base, test_panic);
+            
+        }
         
         uint64_t check_bootmode = find_check_bootmode(iboot_base, idata, isize);
         if(!check_bootmode)
@@ -118,16 +159,27 @@ int main(int argc, char **argv)
             
             patch_bootx_cmd_handler[0] = iboot_base + zeroBuf;
             printf("change dorwx_cmd_handler -> %016llx\n", iboot_base + zeroBuf);
-            patch_go_cmd_handler[0] = iboot_base + zeroBuf + a11rxw_len;
-            printf("change go_cmd_handler -> %016llx\n", iboot_base + zeroBuf + a11rxw_len);
+            patch_go_cmd_handler[0] = iboot_base + zeroBuf + a10_a11rxw_len;
+            printf("change go_cmd_handler -> %016llx\n", iboot_base + zeroBuf + a10_a11rxw_len);
+            
+            printf("writing sdram_page1\n");
+            uint64_t* ptr = (uint64_t*)(a10_a11rxw + (a10_a11rxw_len-8));
+            ptr[0] = sdram_page1;
+            printf("writing load_address\n");
+            ptr = (uint64_t*)(go_cmd_hook + (go_cmd_hook_len-0x10));
+            ptr[0] = load_address-SUB;
+            ptr[1] = load_address;
+            
+            ptr = (uint64_t*)(tram + (tram_len-8));
+            ptr[0] = load_address-SUB+4;
             
             printf("copying payload...\n");
-            memcpy((void*)(idata + zeroBuf), a11rxw, a11rxw_len);
-            memcpy((void*)(idata + zeroBuf + a11rxw_len), go_cmd_hook, go_cmd_hook_len);
-            memcpy((void*)(idata + zeroBuf + a11rxw_len + go_cmd_hook_len), tram, tram_len);
+            memcpy((void*)(idata + zeroBuf), a10_a11rxw, a10_a11rxw_len);
+            memcpy((void*)(idata + zeroBuf + a10_a11rxw_len), go_cmd_hook, go_cmd_hook_len);
+            memcpy((void*)(idata + zeroBuf + a10_a11rxw_len + go_cmd_hook_len), tram, tram_len);
             printf("done\n");
             
-            uint64_t jumpto_hook_addr = zeroBuf + a11rxw_len + go_cmd_hook_len;
+            uint64_t jumpto_hook_addr = zeroBuf + a10_a11rxw_len + go_cmd_hook_len;
             uint32_t opcode = make_branch(jumpto_bl, jumpto_hook_addr);
             printf("jumpto_bl_opcode: %08x\n", opcode);
             uint32_t* patch_jumpto_bl = (uint32_t*)(idata + jumpto_bl);
