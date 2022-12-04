@@ -11,6 +11,7 @@
 //  Copyright (c) 2021 sakuRdev. All rights reserved.
 //
 
+#include <stdlib.h>
 #include <stdint.h>
 #include "offsetfinder.h"
 
