@@ -22,3 +22,5 @@
 > go boot
 ```
 
+## credits
+[exploit3dguy](https://gist.github.com/exploit3dguy) for [internationalhackingsolutionsfbi.s](https://gist.github.com/exploit3dguy/a600c1df8b4abd242c9314d20e2961c5)
