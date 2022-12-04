@@ -17,7 +17,7 @@
 
 ./irecovery -s
 > dorwx
-> /upload [payload.bin/payload_t8010.bin]
+> /upload [payload_t8015.bin/payload_t8010.bin]
 > go
 > go boot
 ```
